@@ -8,10 +8,10 @@ import torch.nn.functional as F
 
 
 class DropPath(nn.Module):
-    """Stochastic depth per sample.
+    """Stochastic depth per sample.  샘플당 깊이. 
 
     This class is provided so students do not need to depend on timm internals
-    for ConvNetV3 regularization experiments.
+    for ConvNetV3 regularization experiments.  
     """
 
     def __init__(self, drop_prob: float = 0.0):
@@ -31,15 +31,15 @@ class DropPath(nn.Module):
 # -----------------------------------------------------------------------------
 # Problem 1: Linear Classifier
 # -----------------------------------------------------------------------------
-class LinearClassifier(nn.Module):
-    def __init__(self, in_channels: int = 3072, num_classes: int = 10):
+class LinearClassifier(nn.Module):  
+    def __init__(self, in_channels: int = 3072, num_classes: int = 10): # 3, 32,32 
         super().__init__()
         # Fill this: define a linear classifier head.
         # Hint: CIFAR-10 image input is flattened in forward(). # 레이어 
         self.head = nn.Linear(in_channels, num_classes)
         
     def forward(self, x: torch.Tensor) -> torch.Tensor: # 데이터 흐름
-        x = x.reshape((x.shape[0], -1))
+        x = x.reshape((x.shape[0], -1)) # b. 3072 
         return self.head(x)
 
 
@@ -49,7 +49,7 @@ class LinearClassifier(nn.Module):
 class MLPBlock(nn.Module):
     def __init__(self, in_channels: int = 3072, hidden_dim: int = 512):
         super().__init__()
-        self.linear = nn.Linear(in_channels, hidden_dim)
+        self.linear = nn.Linear(in_channels, hidden_dim) 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # [수정 위치] MLPBlock.forward (56번째 줄 근처)
@@ -70,7 +70,7 @@ class MLP(nn.Module):
         #   2. "Hidden layers should be grouped by nn.ModuleList"
         #      → nn.ModuleList 로 묶어야 PyTorch 가 파라미터를 올바르게 추적한다.
         #   채널 흐름:
-        #     1st block: in_channels(3072) → hidden_dim  (이미지 차원 압축)
+        #     1st block: in_channels(3072) → hidden_dim  (이미지 차원 압축) 차원 압축
         #     2nd block: hidden_dim        → hidden_dim  (동일 차원 유지)
         self.hidden = nn.ModuleList([
             MLPBlock(in_channels, hidden_dim),  # 1st hidden layer: flatten 이미지 → hidden
@@ -174,7 +174,10 @@ class ConvNetV2Block(nn.Module):
         super().__init__()
         padding = (kernel_size - 1) // 2
         # Fill this: define conv1/norm1/conv2/norm2 for a residual block.
-        raise NotImplementedError("Problem 4: implement ConvNetV2Block.__init__")
+        self.conv1 = nn.Conv2d(dim, dim, kernel_size, padding=padding )
+        self.norm1 = nn.BatchNorm2d(dim)
+        self.conv2 = nn.Conv2d(dim,dim, kernel_size, padding=padding)
+        self.norm2 = nn.BatchNorm2d(dim)
         self.droppath = DropPath(droppath) if droppath > 0 else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -201,14 +204,23 @@ class ConvNetV2(nn.Module):
         if not (len(blocks) == len(dims) == len(strides)):
             raise ValueError("blocks, dims, and strides must have the same length.")
 
+        # 각 stage마다 downsample 블록 1개씩 추가
+        # in_dim을 갱신하며 이전 stage 출력 채널 → 다음 stage 입력 채널로 연결
         self.downsamples = nn.ModuleList()
-        # Fill this: add one ConvNetV2DownsampleBlock per stage.
-        raise NotImplementedError("Problem 4: implement ConvNetV2 downsamples")
+        in_dim = in_channels
+        for dim, stride in zip(dims, strides):
+            self.downsamples.append(
+                ConvNetV2DownsampleBlock(in_dim=in_dim, dim=dim, stride=stride)
+            )
+            in_dim = dim
 
+        # 각 stage마다 num_blocks개의 잔차 블록을 nn.Sequential로 묶어 추가
         self.layers = nn.ModuleList()
-        # Fill this: add the requested number of ConvNetV2Block layers per stage.
-        # Hint: use nn.Sequential for each stage and optionally vary droppath per block.
-        raise NotImplementedError("Problem 4: implement ConvNetV2 stages")
+        for dim, num_blocks in zip(dims, blocks):
+            stage = []
+            for _ in range(num_blocks):
+                stage.append(ConvNetV2Block(dim=dim, droppath=droppath))
+            self.layers.append(nn.Sequential(*stage))
 
         self.norm = nn.BatchNorm1d(dims[-1])
         self.dropout = nn.Dropout(dropout)
