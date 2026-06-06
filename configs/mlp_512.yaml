@@ -1,0 +1,53 @@
+run:
+  name: mlp_512
+  seed: 42
+  deterministic: false
+  output_dir: outputs
+  use_timestamp: true
+dataset:
+  name: cifar10
+  root: data
+  num_classes: 10
+  mean:
+  - 0.491
+  - 0.482
+  - 0.447
+  std:
+  - 0.247
+  - 0.244
+  - 0.262
+  batch_size: 128
+  num_workers: 3
+  pin_memory: true
+  drop_last: true
+augment:
+  train:
+    random_crop_padding: 0
+    horizontal_flip_prob: 0.0
+    randaugment:
+      enabled: false
+      num_ops: 2
+      magnitude: 5
+    random_erasing_prob: 0.0
+model:
+  name: mlp
+  num_classes: 10
+  in_channels: 3072
+  hidden_dim: 512
+train:
+  device: auto
+  epochs: 90
+  label_smoothing: 0.0
+optimizer:
+  lr: 0.001
+  weight_decay: 0.0
+logging:
+  wandb:
+    enabled: false
+    project: lab2-cifar10
+    entity: null
+    mode: online
+    group: lab2
+    tags: []
+    watch_model: false
+    log_checkpoints: false

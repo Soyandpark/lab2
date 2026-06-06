@@ -1,0 +1,52 @@
+run:
+  name: resnet50_finetune
+  seed: 42
+  deterministic: false
+  output_dir: outputs
+  use_timestamp: true
+dataset:
+  name: cifar10
+  root: data
+  num_classes: 10
+  mean:
+  - 0.491
+  - 0.482
+  - 0.447
+  std:
+  - 0.247
+  - 0.244
+  - 0.262
+  batch_size: 128
+  num_workers: 3
+  pin_memory: true
+  drop_last: true
+augment:
+  train:
+    random_crop_padding: 4
+    horizontal_flip_prob: 0.5
+    randaugment:
+      enabled: true
+      num_ops: 2
+      magnitude: 5
+    random_erasing_prob: 0.25
+model:
+  name: resnet50_finetune
+  num_classes: 10
+  pretrained: true
+train:
+  device: auto
+  epochs: 20
+  label_smoothing: 0.0
+optimizer:
+  lr: 5.0e-05
+  weight_decay: 0.05
+logging:
+  wandb:
+    enabled: false
+    project: lab2-cifar10
+    entity: null
+    mode: online
+    group: lab2
+    tags: []
+    watch_model: false
+    log_checkpoints: false
