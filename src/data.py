@@ -18,21 +18,42 @@ def _get_stats(dataset_cfg: Dict) -> tuple[tuple[float, ...], tuple[float, ...]]
 
 
 def build_transform(dataset_cfg: Dict, augment_cfg: Dict | None, train: bool) -> v2.Compose:
+    """Build a torchvision v2 transform pipeline.
+
+    Args:
+        dataset_cfg: Dataset settings (may contain `mean`/`std`).
+        augment_cfg: Augmentation settings (from config `augment.train`).
+        train: If True, include training-time augmentations.
+
+    Supported augment keys (examples):
+      - random_crop_padding: int
+      - horizontal_flip_prob: float (0.0-1.0)
+      - randaugment: {enabled: bool, num_ops: int, magnitude: int}
+      - random_erasing_prob: float (0.0-1.0)
+    """
     augment_cfg = augment_cfg or {}
     mean, std = _get_stats(dataset_cfg)
-    ops = []
+
+    ops: list = []
 
     if train:
-        # Fill this: Problem 5 / Problem 6 augmentation before tensor conversion.
-        # Use configs such as:
-        #   augment.train.random_crop_padding
-        #   augment.train.horizontal_flip_prob
-        #   augment.train.randaugment.enabled
-        #   augment.train.randaugment.num_ops
-        #   augment.train.randaugment.magnitude
-        # Expected operations: RandomCrop, RandomHorizontalFlip, RandAugment.
-        pass
+        # 1) Spatial/color augmentations on PIL images (before tensor conversion)
+        crop_padding = int(augment_cfg.get("random_crop_padding", 0))
+        if crop_padding > 0:
+            ops.append(v2.RandomCrop(32, padding=crop_padding))
 
+        flip_prob = float(augment_cfg.get("horizontal_flip_prob", 0.0))
+        if flip_prob > 0.0:
+            ops.append(v2.RandomHorizontalFlip(p=flip_prob))
+
+        ra_cfg = augment_cfg.get("randaugment", {}) or {}
+        if bool(ra_cfg.get("enabled", False)):
+            ops.append(v2.RandAugment(
+                num_ops=int(ra_cfg.get("num_ops", 2)),
+                magnitude=int(ra_cfg.get("magnitude", 5)),
+            ))
+
+    # Convert to tensor, ensure dtype/scale, then normalize
     ops.extend([
         v2.PILToTensor(),
         v2.ToDtype(torch.float32, scale=True),
@@ -40,9 +61,10 @@ def build_transform(dataset_cfg: Dict, augment_cfg: Dict | None, train: bool) ->
     ])
 
     if train:
-        # Fill this: Problem 5 / Problem 6 random erasing after normalization.
-        # Use augment.train.random_erasing_prob from YAML.
-        pass
+        # 2) Random erasing is applied on tensors after normalization
+        erasing_prob = float(augment_cfg.get("random_erasing_prob", 0.0))
+        if erasing_prob > 0.0:
+            ops.append(v2.RandomErasing(p=erasing_prob))
 
     return v2.Compose(ops)
 
